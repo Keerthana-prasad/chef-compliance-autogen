@@ -1,0 +1,33 @@
+# Scan-only cloud guardrails for the AWS side of a cross-cloud DR setup
+# (S3 primary bucket). Uses the inspec-aws resource pack.
+# Run with:  inspec exec build/profiles/aws-dr-storage -t aws:// --input primary_bucket=<name>
+benchmark:
+  name: aws-dr-storage
+  title: Cross-cloud DR storage guardrails (AWS)
+  version: 0.1.0
+  platform: aws
+  maintainer: Compliance Automation
+
+rules:
+  - id: s3-01
+    title: Primary DR bucket must not be public
+    impact: 1.0
+    tags: [s3, data-exposure]
+    rationale: Backup data is a full copy of production data and must never be public.
+    type: aws_s3_bucket
+    params: {input: primary_bucket, default: dr-primary-bucket, check: not_public}
+
+  - id: s3-02
+    title: Primary DR bucket must have default encryption
+    impact: 0.9
+    tags: [s3, encryption]
+    type: aws_s3_bucket
+    params: {input: primary_bucket, default: dr-primary-bucket, check: default_encryption}
+
+  - id: s3-03
+    title: Primary DR bucket must have versioning enabled
+    impact: 0.8
+    tags: [s3, recoverability]
+    rationale: Versioning lets an overwritten or deleted object be recovered.
+    type: aws_s3_bucket
+    params: {input: primary_bucket, default: dr-primary-bucket, check: versioning}

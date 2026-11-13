@@ -1,0 +1,57 @@
+name: compliance-pipeline
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  generate:
+    name: Generate content + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install generator dependencies
+        run: pip install -r requirements.txt
+
+      - name: Unit tests (includes "committed build/ is up to date" check)
+        run: pytest -q
+
+      - name: Ruby syntax check of every generated file
+        run: find build -name '*.rb' -print0 | xargs -0 -n1 ruby -c
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-content
+          path: build/
+
+  scan-remediate-rescan:
+    name: Scan -> remediate -> rescan (Docker)
+    needs: generate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Cinc Auditor (community build of Chef InSpec)
+        run: curl -fsSL https://omnitruck.cinc.sh/install.sh | sudo bash -s -- -P cinc-auditor
+
+      - name: Lint generated Linux profile
+        run: cinc-auditor check build/profiles/linux-baseline
+
+      - name: Run compliance loop
+        run: bash test-platform/run_compliance_loop.sh
+
+      - name: Before/after summary
+        if: always()
+        run: python3 scripts/summarize_reports.py reports/before.json reports/after.json >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compliance-reports
+          path: reports/

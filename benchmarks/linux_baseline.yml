@@ -1,0 +1,69 @@
+# Source of truth for the Linux baseline. Engineers edit THIS file;
+# the InSpec profile and the Chef cookbook are generated from it.
+# Rules are CIS-inspired, not an official CIS benchmark.
+benchmark:
+  name: linux-baseline
+  title: Linux Baseline Hardening (CIS-inspired)
+  version: 0.1.0
+  platform: debian
+  maintainer: Compliance Automation
+
+rules:
+  - id: ssh-01
+    title: Disable SSH root login
+    impact: 1.0
+    tags: [ssh, access-control]
+    rationale: Direct root login removes accountability; administrators should log in
+      as a named user and escalate with sudo.
+    type: sshd_option
+    params: {key: PermitRootLogin, value: "no"}
+
+  - id: ssh-02
+    title: Disable SSH password authentication
+    impact: 0.9
+    tags: [ssh, authentication]
+    rationale: Password logins can be brute-forced; key-based authentication cannot
+      be guessed the same way.
+    type: sshd_option
+    params: {key: PasswordAuthentication, value: "no"}
+
+  - id: ssh-03
+    title: Disable SSH X11 forwarding
+    impact: 0.5
+    tags: [ssh]
+    rationale: X11 forwarding exposes the client display to the server and is rarely needed.
+    type: sshd_option
+    params: {key: X11Forwarding, value: "no"}
+
+  - id: ssh-04
+    title: Limit SSH authentication attempts to 4
+    impact: 0.7
+    tags: [ssh, brute-force]
+    rationale: A low limit slows down online password guessing.
+    type: sshd_option
+    params: {key: MaxAuthTries, value: 4, compare: max}
+
+  - id: file-01
+    title: /etc/shadow must not be world-readable
+    impact: 1.0
+    tags: [file-permissions]
+    rationale: /etc/shadow holds password hashes; world-readable hashes can be cracked offline.
+    type: file_permissions
+    params: {path: /etc/shadow, max_mode: "0640", owner: root, group: shadow}
+
+  - id: pkg-01
+    title: Telnet client must not be installed
+    impact: 0.6
+    tags: [packages, legacy-protocols]
+    rationale: Telnet sends credentials in clear text; use SSH instead.
+    type: package_absent
+    params: {name: telnet}
+
+  - id: pwd-01
+    title: Passwords must expire within 365 days
+    impact: 0.5
+    tags: [authentication, password-policy]
+    rationale: Limits how long a leaked password stays usable. Stricter existing values
+      are kept, never loosened.
+    type: login_defs
+    params: {key: PASS_MAX_DAYS, value: 365, compare: max}
